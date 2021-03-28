@@ -402,10 +402,30 @@ class SellerCentralBusinessReports{
             await this.#Page.waitForSelector('#toDate2', {visible: true})
             await this.#Page.click('#toDate2')
             await this.#Page.evaluate(()=> document.querySelector('#toDate2').value='')
-            await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
+            await this.#Page.keyboard.type(format(new Date(rDate.end),'MM/DD/YYYY'), {
                 delay: randomInt(100, 400),
             })
-            await this.#Page.waitForTimeout(500)
+            await this.#Page.waitForTimeout(1500)
+            // verify dates
+            const datesGood = await this.#Page.evaluate(()=>{
+                return document.querySelector('#fromDate2').value === format(new Date(rDate.start),'MM/DD/YYYY') &&
+                    document.querySelector('#toDate2').value === format(new Date(rDate.end),'MM/DD/YYYY')
+            })
+            if(datesGood === false){
+                // enter start date again
+                await this.#Page.click('#fromDate2')
+                await this.#Page.evaluate(()=> document.querySelector('#fromDate2').value='')
+                await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
+                    delay: randomInt(100, 400),
+                })
+                // enter end date again
+                await this.#Page.click('#toDate2')
+                await this.#Page.evaluate(()=> document.querySelector('#toDate2').value='')
+                await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
+                    delay: randomInt(100, 400),
+                })
+            }
+            await this.#Page.waitForTimeout(1500)
             // submit
             await this.#Page.keyboard.press('Enter')
             await this.#Page.waitForTimeout(5000)
