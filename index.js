@@ -604,7 +604,35 @@ class SellerCentralBusinessReports{
         await this.#setAccountMap()
     }
 }
+/**
+ * One-Time Password Resolution Settings
+ * @typedef {Object} otpSettings
+ * @property {string} TWILIO_ACCOUNT_SID - Twilio account sid
+ * @property {string} TWILIO_AUTH_TOKEN - Twilio account auth token
+ */
 
+/**
+ * Captcha Resolution Settings
+ * @typedef {Object} captchaSettings
+ * @property {string} TWOCAPTCHA_API_KEY - 2captcha api key
+ */
+
+/**
+ * The settings object.
+ * @typedef {Object} settingsObject
+ * @property {string} loginEmail - seller central login email address or phone number
+ * @property {string} loginPass - seller central login password
+ * @property {otpSettings} otp - One-Time Password retrieval credentials
+ * @property {captchaSettings} captcha - Captcha resolution credentials
+ */
+
+/**
+ * Download Business Reports from Amazon Seller Central
+ * @param {settingsObject} settings - The Settings Object
+ * @param {array[]} dates - Array of Date Ranges for Reports
+ * @param {object} options - The Options Settings Object
+ * @return {Promise<module:stream.internal.Readable|false>}
+ */
 module.exports = async (settings, dates, options) => {
     const bizReports = new SellerCentralBusinessReports()
     return await bizReports.getReports(settings, dates, options)

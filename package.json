@@ -1,6 +1,6 @@
 {
   "name": "amazon-sc-business-reports",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Automated Amazon Seller Central Business Reports Downloader",
   "main": "index.js",
   "scripts": {
@@ -12,12 +12,10 @@
   },
   "keywords": [
     "amazon",
-    "seller",
-    "central",
-    "business",
-    "reports",
+    "seller central",
+    "business reports",
     "downloader",
-    "sc-business-reports"
+    "amazon-sc-business-reports"
   ],
   "author": "Rick Somers",
   "license": "MIT",

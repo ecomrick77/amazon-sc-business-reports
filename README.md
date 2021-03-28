@@ -9,6 +9,12 @@ Amazon's Seller Central Business Reports provide valuable insights for retailers
 - **[Twilio](https://www.twilio.com/)** - In order to provide automated One Time Password (OTP) Two-Step Authorization you'll need to add a Twilio Phone Number to your Amazon Seller Account and provide the API credentials in the settings.
 - **[2Captcha](https://2captcha.com/)** - In order to provide automated Captcha Image resolution you'll need to provide the API key in the settings
 
+## Installation
+
+```shell
+$ npm i amazon-sc-business-reports
+```
+
 ## Basic Usage
 
 ```javascript
