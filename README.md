@@ -2,7 +2,7 @@
 
 **Automated Amazon Seller Central Business Reports Downloader**
 
-Amazon's Seller Central Business Reports provide valuable insights for retailers that are not available through any Report Scheduling or API. This package uses Puppeteer to control a Chrome browser that navigates Seller Central, downloading all the reports and returning the results in JSON.
+Amazon's Seller Central Business Reports provide valuable insights for retailers that are not available through any Report Scheduling or API. This package uses Puppeteer to control a headless Chrome browser which navigates Seller Central, downloading all the reports (for each merchant and marketplace) and returning the results in JSON.
 
 **Requirements:**
 
@@ -111,7 +111,7 @@ By Default all Reports are downloaded for each Merchant and Marketplace in the S
 
 Here are some Report Response Examples. 
 
-Currencies are returned in the local marketplace currency often prefixed with a 3-digit country code (Example: Can$619.90, Mex$1619.90). 
+Currencies are returned in the local marketplace currency often prefixed with a 3-digit country code (Example: Can$619.90, MXN$4,829.37). 
 
 ### SalesTraffic:
 

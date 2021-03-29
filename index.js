@@ -35,12 +35,15 @@ class SellerCentralBusinessReports{
 
     async #startPuppeteer(){
         this.#Browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             defaultViewport: null,
             args: [`--window-size=1600,900`]
         });
         this.#Page = await this.#Browser.newPage();
         await this.#Page.exposeFunction('JSDOM', JSDOM);
+        await this.#Page.setDefaultTimeout(90000) // 90 seconds (3x default)
+        await this.#Page.setDefaultNavigationTimeout(90000)
+        await this.#Page.exposeFunction("format", format);
     }
 
     /**
@@ -259,28 +262,33 @@ class SellerCentralBusinessReports{
         await fs.access(uniqueDir).catch(async ()=>{
             await fs.mkdir(uniqueDir)
         });
-        await asyncForEach(this.#Accounts.filter(a => a.excluded === false),async a => {
+        await asyncForEach(this.#Accounts.filter(a => a.excluded === false)
+            .filter(a => {
+                return !(a.merchant === this.#AccountSelected.partner && inarray(this.#Options.exclude.merchantIds, this.#AccountSelected.merchant));
+            }),async a => {
             // merchant
-            let merchantDir = path.resolve(uniqueDir+'/'+a.merchant)
-            await fs.access(merchantDir).catch(async ()=>{
-                await fs.mkdir(merchantDir)
-            });
             await asyncForEach(a.markets.filter(m => m.excluded === false), async m => {
                 // marketplace
-                console.log('getReports:', {
-                    account: a.name,
-                    merchant: a.merchant,
-                    marketplace: m.marketplace
-                })
+                if(m.selected === false) {
+                    // change merchant+marketplace
+                    await this.#setAccountChange(a.merchant, m.marketplace)
+                }
+
+                // true merchantId only available when selected
+                let merchantDir = path.resolve(uniqueDir+'/'+this.#AccountSelected.merchant)
+                await fs.access(merchantDir).catch(async ()=>{
+                    await fs.mkdir(merchantDir)
+                });
                 let marketplaceDir = path.resolve(merchantDir+'/'+m.marketplace)
                 await fs.access(marketplaceDir).catch(async ()=>{
                     await fs.mkdir(marketplaceDir);
                 })
 
-                if(m.selected === false) {
-                    // change merchant+marketplace
-                    await this.#setAccountChange(a.merchant, m.marketplace)
-                }
+                console.log('getReports:', {
+                    account: a.name,
+                    merchant: this.#AccountSelected.merchant,
+                    marketplace: m.marketplace
+                })
 
                 // Amazon Seller Central Business Reports
                 // SalesTraffic
@@ -390,41 +398,27 @@ class SellerCentralBusinessReports{
                 behavior: 'allow',
                 downloadPath: path.resolve(downloadDir),
             });
-            await this.#Page.waitForTimeout(10000)
+            await this.#Page.waitForTimeout(15000)
             // enter start date
             await this.#Page.waitForSelector('#fromDate2', {visible: true})
             await this.#Page.click('#fromDate2')
+            await this.#Page.evaluate(()=> document.querySelector('#fromDate2').focus())
+            await this.#Page.waitForTimeout(500)
             await this.#Page.evaluate(()=> document.querySelector('#fromDate2').value='')
+            await this.#Page.waitForTimeout(500)
             await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
                 delay: randomInt(100, 400),
             })
             // enter end date
             await this.#Page.waitForSelector('#toDate2', {visible: true})
             await this.#Page.click('#toDate2')
+            await this.#Page.evaluate(()=> document.querySelector('#toDate2').focus())
+            await this.#Page.waitForTimeout(500)
             await this.#Page.evaluate(()=> document.querySelector('#toDate2').value='')
+            await this.#Page.waitForTimeout(500)
             await this.#Page.keyboard.type(format(new Date(rDate.end),'MM/DD/YYYY'), {
                 delay: randomInt(100, 400),
             })
-            await this.#Page.waitForTimeout(1500)
-            // verify dates
-            const datesGood = await this.#Page.evaluate(()=>{
-                return document.querySelector('#fromDate2').value === format(new Date(rDate.start),'MM/DD/YYYY') &&
-                    document.querySelector('#toDate2').value === format(new Date(rDate.end),'MM/DD/YYYY')
-            })
-            if(datesGood === false){
-                // enter start date again
-                await this.#Page.click('#fromDate2')
-                await this.#Page.evaluate(()=> document.querySelector('#fromDate2').value='')
-                await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
-                    delay: randomInt(100, 400),
-                })
-                // enter end date again
-                await this.#Page.click('#toDate2')
-                await this.#Page.evaluate(()=> document.querySelector('#toDate2').value='')
-                await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
-                    delay: randomInt(100, 400),
-                })
-            }
             await this.#Page.waitForTimeout(1500)
             // submit
             await this.#Page.keyboard.press('Enter')
@@ -438,10 +432,12 @@ class SellerCentralBusinessReports{
             await this.#Page.click('span#downloadCSV')
             const dwMenu = await this.#Page.evaluate(()=> document.querySelector('div#export ul.actionsDDsub').style.display)
             if(dwMenu === 'block'){
+                await this.#Page.waitForTimeout(3000)
                 await this.#Page.click('#downloadCSV') // bug fix
             }
             await this.#Page.waitForTimeout(10000) // wait for download
             // TODO: ...to be continued
+            // https://github.com/puppeteer/puppeteer/issues/299
         })
     }
 
@@ -541,7 +537,8 @@ class SellerCentralBusinessReports{
         // clicking account menu marketplace
         console.log('CLICKING...', merchant, marketplace)
         await this.#Page.click('#merchant_'+merchant+' a#'+marketplace).catch(async ()=>{
-            await this.#Page.waitForTimeout(3000)
+            await this.#Page.waitForTimeout(5000)
+            await this.#Page.waitForSelector('#merchant_label_' + merchant)
             await this.#Page.click('#merchant_label_' + merchant)
             await this.#Page.click('#merchant_'+merchant+' a#'+marketplace)
         })
