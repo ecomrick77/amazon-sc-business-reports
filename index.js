@@ -1,20 +1,19 @@
 const puppeteer = require('puppeteer'),
     axios = require('axios').default,
+    CaptchaClient = require('@infosimples/node_two_captcha'),
     jsdom = require("jsdom"),
     { JSDOM } = jsdom,
-    sleep = require('sleep'),
-    asyncForEach = require('async-await-foreach'),
-    _ = require('lodash'),
-    { format } = require('fecha'),
-    randomInt = require('random-int'),
-    CaptchaClient = require('@infosimples/node_two_captcha'),
-    fsc = require('fs'),
+    uuid = require('uuid'),
     fs = require('fs/promises'),
     path = require('path'),
+    csv=require('csvtojson'),
+    _ = require('lodash'),
+    asyncForEach = require('async-await-foreach'),
+    { format } = require('fecha'),
+    sleep = require('sleep'),
+    randomInt = require('random-int'),
     merge = require('deepmerge'),
     inarray = require('inarray'),
-    uuid = require('uuid'),
-    csv=require('csvtojson'),
     { Readable } = require('stream'),
     outputStream = new Readable({
         read() {}, objectMode: true
@@ -439,65 +438,42 @@ class SellerCentralBusinessReports{
                     if (size === lastSize) {
                         // download complete
                         clearInterval(that.#FileProgress[merchant + '.' + marketplace].intvId)
-                        let csvFile = path.resolve(downloadDir + '/' + file)
-                        let jsonResults = await csv({checkType: true}).fromFile(csvFile)
-                        let vars = csvFile.split(that.#UniqueId + '/')[1].split('/')
-                        let dates = vars[3].split('_')
-                        outputStream.push({
-                            merchant: vars[0],
-                            marketplace: vars[1],
-                            report: that.#ShortNames[vars[2]],
-                            reportId: vars[2],
-                            period: {
-                                from: dates[0],
-                                to: dates[1],
-                            },
-                            rows: jsonResults.map(fields => {
-                                let remap = {}
-                                _.forEach(fields, (v, i) => {
-                                    remap[_.camelCase(i)] = v
-                                })
-                                return remap
-                            })
-                        })
+                        // stream response
+                        outputStream.push(await that.#getReportResponse(downloadDir,file))
                         resolve()
                     }
                     that.#FileProgress[merchant + '.' + marketplace].size = size
-                }, 15000, merchant, marketplace, downloadDir, this)
+                }, 10000, merchant, marketplace, downloadDir, this)
                 this.#FileProgress[merchant + '.' + marketplace] = {
                     intvId: intvId,
-                    size: 0
+                    size: -1
                 }
             }))
         })
     }
 
-    async #getDownloads(dir) {
-        return new Promise((resolve, reject) => {
-            fsc.readdir(dir, (error, files) => {
-                if (error) {
-                    return reject(error);
-                }
-                Promise.all(files.map((file) => {
-                    return new Promise((resolve, reject) => {
-                        const filepath = path.join(dir, file);
-                        fsc.stat(filepath, (error, stats) => {
-                            if (error) {
-                                return reject(error);
-                            }
-                            if (stats.isDirectory()) {
-                                this.#getDownloads(filepath).then(resolve);
-                            } else if (stats.isFile()) {
-                                resolve(filepath);
-                            }
-                        });
-                    });
-                }))
-                    .then((foldersContents) => {
-                        resolve(foldersContents.reduce((all, folderContents) => all.concat(folderContents), []));
-                    });
-            });
-        });
+    async #getReportResponse(downloadDir,file){
+        let csvFile = path.resolve(downloadDir + '/' + file)
+        let jsonResults = await csv({checkType: true}).fromFile(csvFile)
+        let vars = csvFile.split(this.#UniqueId + '/')[1].split('/')
+        let dates = vars[3].split('_')
+        return {
+            merchant: vars[0],
+            marketplace: vars[1],
+            report: this.#ShortNames[vars[2]],
+            reportId: vars[2],
+            period: {
+                from: dates[0],
+                to: dates[1],
+            },
+            rows: jsonResults.map(fields => {
+                let remap = {}
+                _.forEach(fields, (v, i) => {
+                    remap[_.camelCase(i)] = v
+                })
+                return remap
+            })
+        }
     }
 
     /**
@@ -507,8 +483,13 @@ class SellerCentralBusinessReports{
     async #setAccounts(){
         await this.#Page.waitForSelector('#sc-mkt-switcher')
         await this.#setAccountSelected()
-        await this.#Page.click('#sc-mkt-switcher') // open
+        await this.#Page.click('#sc-mkt-switcher button.dropdown-button')
         await this.#Page.waitForSelector('input[type="checkbox"]')
+        await this.#Page.evaluate(() => {
+            document.querySelector('#sc-navbar-container .dropdown-content').style.display='block'
+            document.querySelectorAll('#sc-navbar-container .merchant-level')
+                .forEach(e => e.style.display='block')
+        })
         // set merchant group id
         await this.#Page.evaluate(() => document.querySelectorAll('input[type="checkbox"]')
             .forEach(c => c.parentElement.setAttribute('id',c.getAttribute('id')
@@ -551,7 +532,6 @@ class SellerCentralBusinessReports{
             })
         }
         await this.#setAccountMap()
-        await this.#Page.click('#sc-mkt-switcher') // close
     }
 
     /**
@@ -561,18 +541,21 @@ class SellerCentralBusinessReports{
      * @return void
      */
     async #setAccountChange(merchant,marketplace) {
-        await this.#Page.waitForSelector('#sc-mkt-switcher')
+        /*
+        await this.#Page.waitForSelector('#sc-mkt-switcher button')
         await this.#Page.click('#sc-mkt-switcher') // open
         await this.#Page.waitForSelector('input[type="checkbox"]')
         await this.#Page.waitForTimeout(3000)
         // clicking account menu marketplace
-        console.log('CLICKING...', merchant, marketplace)
+        console.log('Clicking Menu...', merchant, marketplace)
         await this.#Page.click('#merchant_'+merchant+' a#'+marketplace).catch(async ()=>{
             await this.#Page.waitForTimeout(5000)
             await this.#Page.waitForSelector('#merchant_label_' + merchant)
             await this.#Page.click('#merchant_label_' + merchant)
             await this.#Page.click('#merchant_'+merchant+' a#'+marketplace)
         })
+         */
+        await this.#Page.click('#merchant_'+merchant+' a#'+marketplace)
         await this.#Page.waitForTimeout(5000) // page changed
         // navigating to reports dashboard
         await this.#Page.goto(this.#ReportsUrl, {
