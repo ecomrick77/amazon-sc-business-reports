@@ -541,20 +541,6 @@ class SellerCentralBusinessReports{
      * @return void
      */
     async #setAccountChange(merchant,marketplace) {
-        /*
-        await this.#Page.waitForSelector('#sc-mkt-switcher button')
-        await this.#Page.click('#sc-mkt-switcher') // open
-        await this.#Page.waitForSelector('input[type="checkbox"]')
-        await this.#Page.waitForTimeout(3000)
-        // clicking account menu marketplace
-        console.log('Clicking Menu...', merchant, marketplace)
-        await this.#Page.click('#merchant_'+merchant+' a#'+marketplace).catch(async ()=>{
-            await this.#Page.waitForTimeout(5000)
-            await this.#Page.waitForSelector('#merchant_label_' + merchant)
-            await this.#Page.click('#merchant_label_' + merchant)
-            await this.#Page.click('#merchant_'+merchant+' a#'+marketplace)
-        })
-         */
         await this.#Page.click('#merchant_'+merchant+' a#'+marketplace)
         await this.#Page.waitForTimeout(5000) // page changed
         // navigating to reports dashboard
