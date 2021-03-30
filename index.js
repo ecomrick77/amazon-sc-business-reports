@@ -460,9 +460,9 @@ class SellerCentralBusinessReports{
                                 return remap
                             })
                         })
+                        resolve()
                     }
                     that.#FileProgress[merchant + '.' + marketplace].size = size
-                    resolve()
                 }, 15000, merchant, marketplace, downloadDir, this)
                 this.#FileProgress[merchant + '.' + marketplace] = {
                     intvId: intvId,
