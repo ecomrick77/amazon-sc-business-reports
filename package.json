@@ -1,6 +1,6 @@
 {
   "name": "amazon-sc-business-reports",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Automated Amazon Seller Central Business Reports Downloader",
   "main": "index.js",
   "scripts": {

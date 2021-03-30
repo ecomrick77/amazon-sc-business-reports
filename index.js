@@ -32,6 +32,17 @@ class SellerCentralBusinessReports{
     #Settings;
     #TwilioRetries=0;
     #UniqueId;
+    #FileProgress={}
+    #FilePromises=[]
+    #ShortNames = {
+        SalesTrafficTimeSeries: 'SalesTraffic',
+        DetailSalesTrafficByTime: 'DetailSalesTraffic',
+        SellerPerformanceForMerchants: 'SellerPerformance',
+        DetailSalesTrafficBySKU: 'DetailSalesTrafficBySKU',
+        DetailSalesTrafficByParentItem: 'DetailSalesTrafficByParent',
+        DetailSalesTrafficByChildItem: 'DetailSalesTrafficByChild',
+        BrandPerformannce: 'BrandPerformance'
+    }
 
     async #startPuppeteer(){
         this.#Browser = await puppeteer.launch({
@@ -44,6 +55,7 @@ class SellerCentralBusinessReports{
         await this.#Page.setDefaultTimeout(90000) // 90 seconds (3x default)
         await this.#Page.setDefaultNavigationTimeout(90000)
         await this.#Page.exposeFunction("format", format);
+        console.log('Started Puppeteer')
     }
 
     /**
@@ -73,11 +85,12 @@ class SellerCentralBusinessReports{
      * @param {settingsObject} settings - The Settings Object
      * @param {array[]} dates - Array of Date Ranges for Reports
      * @param {object} options - The Options Settings Object
-     * @return {Promise<module:stream.internal.Readable|false>}
+     * @return {Promise<module:stream.internal.Readable>}
      */
     async getReports(settings, dates, options = {}){
         try{
             this.#UniqueId = uuid.v4()
+            console.log('Starting Session: ', this.#UniqueId)
             const defaultSettings = {
                 loginEmail: '', // seller central login email address or phone number
                 loginPass: '', // seller central login password
@@ -112,9 +125,10 @@ class SellerCentralBusinessReports{
             await this.#Page.goto(this.#ReportsUrl, {
                 waitUntil: 'networkidle0',
             });
-            return await this.#router()
+            this.#router().then(()=>{})
+            return outputStream
         } catch (err) {
-            console.log('ERROR:', err)
+            console.log('Caught ERROR:', err)
         }
     }
 
@@ -126,13 +140,14 @@ class SellerCentralBusinessReports{
             return await this.#loginOTP()
         } else if(pageTitle === ''){
             console.error('Password Reset Required')
-            return false;
+            return outputStream.push(null);
         } else{
             return await this.#getReports()
         }
     }
 
     async #login(){
+        console.log('@login')
         // clear login email
         await this.#Page.evaluate(()=> document.querySelector('#ap_email').value='')
         // enter login email
@@ -149,6 +164,7 @@ class SellerCentralBusinessReports{
         const captchaImg = await this.#Page.evaluate(()=> document.querySelector('#auth-captcha-image')?.getAttribute('src'))
         let resolvedCaptcha=false
         if(captchaImg){
+            console.log('@login Captcha')
             const captcha = await this.#getCaptchaResolved(captchaImg)
             console.log('Captcha:', captcha)
             await this.#Page.click('#auth-captcha-guess')
@@ -167,6 +183,7 @@ class SellerCentralBusinessReports{
     }
 
     async #loginOTP(){
+        console.log('@loginOTP')
         if(await this.#Page.evaluate(() => document.querySelector('#auth-send-code'))) {
             // OTP number selection
             if(await this.#Page.evaluate(() =>
@@ -219,7 +236,7 @@ class SellerCentralBusinessReports{
             const code = msg.body !== undefined ? msg.body.split(' ')[0]: ''
             if(code) {
                 // return code
-                console.log('OTP-CODE:', code)
+                console.log('OTP Code:', code)
                 return code;
             }
             // retry
@@ -284,7 +301,7 @@ class SellerCentralBusinessReports{
                     await fs.mkdir(marketplaceDir);
                 })
 
-                console.log('getReports:', {
+                console.log('Reports For:', {
                     account: a.name,
                     merchant: this.#AccountSelected.merchant,
                     marketplace: m.marketplace
@@ -293,32 +310,39 @@ class SellerCentralBusinessReports{
                 // Amazon Seller Central Business Reports
                 // SalesTraffic
                 if(this.#Options.reports.SalesTraffic === true) {
+                    console.log('Starting Report: SalesTraffic')
                     await this.#getReport('SalesTrafficTimeSeries', a.merchant, m.marketplace, marketplaceDir)
                 }
                 // DetailSalesTraffic
                 if(this.#Options.reports.DetailSalesTraffic === true) {
+                    console.log('Starting Report: DetailSalesTraffic')
                     await this.#getReport('DetailSalesTrafficByTime', a.merchant, m.marketplace, marketplaceDir)
                 }
                 // SellerPerformance
                 if(this.#Options.reports.SellerPerformance === true) {
+                    console.log('Starting Report: SellerPerformance')
                     await this.#getReport('SellerPerformanceForMerchants', a.merchant, m.marketplace, marketplaceDir)
                 }
                 // DetailSalesTrafficBySKU
                 if(this.#Options.reports.DetailSalesTrafficBySKU === true) {
+                    console.log('Starting Report: DetailSalesTrafficBySKU')
                     await this.#getReport('DetailSalesTrafficBySKU', a.merchant, m.marketplace, marketplaceDir)
                 }
                 // DetailSalesTrafficByParent
                 if(this.#Options.reports.DetailSalesTrafficByParent === true) {
+                    console.log('Starting Report: DetailSalesTrafficByParent')
                     await this.#getReport('DetailSalesTrafficByParentItem', a.merchant, m.marketplace, marketplaceDir)
                 }
                 // DetailSalesTrafficByChild
                 if(this.#Options.reports.DetailSalesTrafficByChild === true) {
+                    console.log('Starting Report: DetailSalesTrafficByChild')
                     await this.#getReport('DetailSalesTrafficByChildItem', a.merchant, m.marketplace, marketplaceDir)
                 }
                 // BrandPerformance
                 if(this.#Options.reports.BrandPerformance === true) {
                     const hasBrandPerformance = await this.#Page.evaluate(() => document.querySelector('#report_BrandPerformannce'))
                     if (hasBrandPerformance) {
+                        console.log('Starting Report: BrandPerformance')
                         await this.#getReport('BrandPerformannce', a.merchant, m.marketplace, marketplaceDir)
                     }
                 }
@@ -328,41 +352,10 @@ class SellerCentralBusinessReports{
             })
         })
 
-        const shortNames = {
-            SalesTrafficTimeSeries: 'SalesTraffic',
-            DetailSalesTrafficByTime: 'DetailSalesTraffic',
-            SellerPerformanceForMerchants: 'SellerPerformance',
-            DetailSalesTrafficBySKU: 'DetailSalesTrafficBySKU',
-            DetailSalesTrafficByParentItem: 'DetailSalesTrafficByParent',
-            DetailSalesTrafficByChildItem: 'DetailSalesTrafficByChild',
-            BrandPerformannce: 'BrandPerformance'
-        }
-        const csvFiles = await this.#getDownloads(path.resolve('./.business-reports/'+this.#UniqueId))
-        asyncForEach(csvFiles, async csvFile => {
-            let jsonResults = await csv({checkType: true}).fromFile(csvFile)
-            let vars = csvFile.split(this.#UniqueId+'/')[1].split('/')
-            let dates = vars[3].split('_')
-            outputStream.push({
-                merchant: vars[0],
-                marketplace: vars[1],
-                report: shortNames[vars[2]],
-                reportId: vars[2],
-                period: {
-                    from: dates[0],
-                    to: dates[1],
-                },
-                rows: jsonResults.map(fields => {
-                    let remap={}
-                    _.forEach(fields, (v,i)=>{
-                        remap[_.camelCase(i)]=v
-                    })
-                    return remap
-                })
-            })
-        }).then(()=>{
+        Promise.allSettled(this.#FilePromises).then(() => {
+            this.#Browser.close()
             outputStream.push(null)
-        })
-        return outputStream
+        });
     }
 
     /**
@@ -387,9 +380,9 @@ class SellerCentralBusinessReports{
                 end: d[1]
             }
         }), async rDate => {
-            let downloadDir = path.resolve(reportDir+'/' +format(new Date(rDate.start),'YYYY-MM-DD')
-                +'_'+format(new Date(rDate.end),'YYYY-MM-DD'))
-            await fs.access(downloadDir).catch(async ()=>{
+            let downloadDir = path.resolve(reportDir + '/' + format(new Date(rDate.start), 'YYYY-MM-DD')
+                + '_' + format(new Date(rDate.end), 'YYYY-MM-DD'))
+            await fs.access(downloadDir).catch(async () => {
                 await fs.mkdir(downloadDir)
             })
             // set download path
@@ -402,21 +395,21 @@ class SellerCentralBusinessReports{
             // enter start date
             await this.#Page.waitForSelector('#fromDate2', {visible: true})
             await this.#Page.click('#fromDate2')
-            await this.#Page.evaluate(()=> document.querySelector('#fromDate2').focus())
+            await this.#Page.evaluate(() => document.querySelector('#fromDate2').focus())
             await this.#Page.waitForTimeout(500)
-            await this.#Page.evaluate(()=> document.querySelector('#fromDate2').value='')
+            await this.#Page.evaluate(() => document.querySelector('#fromDate2').value = '')
             await this.#Page.waitForTimeout(500)
-            await this.#Page.keyboard.type(format(new Date(rDate.start),'MM/DD/YYYY'), {
+            await this.#Page.keyboard.type(format(new Date(rDate.start), 'MM/DD/YYYY'), {
                 delay: randomInt(100, 400),
             })
             // enter end date
             await this.#Page.waitForSelector('#toDate2', {visible: true})
             await this.#Page.click('#toDate2')
-            await this.#Page.evaluate(()=> document.querySelector('#toDate2').focus())
+            await this.#Page.evaluate(() => document.querySelector('#toDate2').focus())
             await this.#Page.waitForTimeout(500)
-            await this.#Page.evaluate(()=> document.querySelector('#toDate2').value='')
+            await this.#Page.evaluate(() => document.querySelector('#toDate2').value = '')
             await this.#Page.waitForTimeout(500)
-            await this.#Page.keyboard.type(format(new Date(rDate.end),'MM/DD/YYYY'), {
+            await this.#Page.keyboard.type(format(new Date(rDate.end), 'MM/DD/YYYY'), {
                 delay: randomInt(100, 400),
             })
             await this.#Page.waitForTimeout(1500)
@@ -424,20 +417,58 @@ class SellerCentralBusinessReports{
             await this.#Page.keyboard.press('Enter')
             await this.#Page.waitForTimeout(5000)
             await this.#Page.waitForSelector('table#dataTable', {visible: true})
-            await this.#Page.waitForSelector('div#export',{visible: true})
-            await this.#Page.evaluate(()=> document.querySelector('div#export ul.actionsDDsub').style.display='block')
+            await this.#Page.waitForSelector('div#export', {visible: true})
+            await this.#Page.evaluate(() => document.querySelector('div#export ul.actionsDDsub').style.display = 'block')
             await this.#Page.waitForTimeout(1500)
             await this.#Page.waitForSelector('span#downloadCSV', {visible: true})
             // start download
             await this.#Page.click('span#downloadCSV')
-            const dwMenu = await this.#Page.evaluate(()=> document.querySelector('div#export ul.actionsDDsub').style.display)
-            if(dwMenu === 'block'){
+            const dwMenu = await this.#Page.evaluate(() => document.querySelector('div#export ul.actionsDDsub').style.display)
+            if (dwMenu === 'block') {
                 await this.#Page.waitForTimeout(3000)
                 await this.#Page.click('#downloadCSV') // bug fix
             }
             await this.#Page.waitForTimeout(10000) // wait for download
-            // TODO: ...to be continued
-            // https://github.com/puppeteer/puppeteer/issues/299
+            this.#FilePromises.push(new Promise((resolve, reject) => {
+                const intvId = setInterval(async function (merchant, marketplace, downloadDir, that) {
+                    const dir = await fs.readdir(downloadDir)
+                    const file = dir[0]
+                    const stats = await fs.stat(path.resolve(downloadDir + '/' + file))
+                    const size = stats.size
+                    const lastSize = that.#FileProgress[merchant + '.' + marketplace].size
+                    if (size === lastSize) {
+                        // download complete
+                        clearInterval(that.#FileProgress[merchant + '.' + marketplace].intvId)
+                        let csvFile = path.resolve(downloadDir + '/' + file)
+                        let jsonResults = await csv({checkType: true}).fromFile(csvFile)
+                        let vars = csvFile.split(that.#UniqueId + '/')[1].split('/')
+                        let dates = vars[3].split('_')
+                        outputStream.push({
+                            merchant: vars[0],
+                            marketplace: vars[1],
+                            report: that.#ShortNames[vars[2]],
+                            reportId: vars[2],
+                            period: {
+                                from: dates[0],
+                                to: dates[1],
+                            },
+                            rows: jsonResults.map(fields => {
+                                let remap = {}
+                                _.forEach(fields, (v, i) => {
+                                    remap[_.camelCase(i)] = v
+                                })
+                                return remap
+                            })
+                        })
+                    }
+                    that.#FileProgress[merchant + '.' + marketplace].size = size
+                    resolve()
+                }, 15000, merchant, marketplace, downloadDir, this)
+                this.#FileProgress[merchant + '.' + marketplace] = {
+                    intvId: intvId,
+                    size: 0
+                }
+            }))
         })
     }
 
