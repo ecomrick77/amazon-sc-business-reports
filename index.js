@@ -43,7 +43,7 @@ class SellerCentralBusinessReports{
         BrandPerformannce: 'BrandPerformance'
     }
 
-    async #startPuppeteer(){
+    #startPuppeteer = async () => {
         this.#Browser = await puppeteer.launch({
             headless: true,
             defaultViewport: null,
@@ -86,7 +86,7 @@ class SellerCentralBusinessReports{
      * @param {object} options - The Options Settings Object
      * @return {Promise<module:stream.internal.Readable>}
      */
-    async getReports(settings, dates, options = {}){
+    getReports = async (settings, dates, options = {}) => {
         try{
             this.#UniqueId = uuid.v4()
             console.log('Starting Session: ', this.#UniqueId)
@@ -131,7 +131,7 @@ class SellerCentralBusinessReports{
         }
     }
 
-    async #router(){
+    #router = async () => {
         const pageTitle = await this.#Page.title()
         if(pageTitle === 'Amazon Sign-In'){
             return await this.#login()
@@ -145,7 +145,7 @@ class SellerCentralBusinessReports{
         }
     }
 
-    async #login(){
+    #login = async () => {
         console.log('@login')
         // clear login email
         await this.#Page.evaluate(()=> document.querySelector('#ap_email').value='')
@@ -181,7 +181,7 @@ class SellerCentralBusinessReports{
         }
     }
 
-    async #loginOTP(){
+    #loginOTP = async () => {
         console.log('@loginOTP')
         if(await this.#Page.evaluate(() => document.querySelector('#auth-send-code'))) {
             // OTP number selection
@@ -215,7 +215,7 @@ class SellerCentralBusinessReports{
      * Resolve a OTP with Twilio
      * @return {string} The resolved OTP code
      */
-    async #getOtpResolved(){
+    #getOtpResolved = async () => {
         // await sms message
         await sleep.msleep(5000)
         // connect to twilio
@@ -254,7 +254,7 @@ class SellerCentralBusinessReports{
      * @param {string} imgUrl - The image URL to resolve
      * @return {string} The resolved captcha string
      */
-    async #getCaptchaResolved(imgUrl){
+    #getCaptchaResolved = async (imgUrl) => {
         // connect to 2captcha
         const client = new CaptchaClient(this.#Settings.captcha.TWOCAPTCHA_API_KEY, {
             timeout: 60000,
@@ -268,7 +268,7 @@ class SellerCentralBusinessReports{
         return response.text
     }
 
-    async #getReports(){
+    #getReports = async () => {
         await this.#setAccounts()
         let storageDir = path.resolve('./.business-reports')
         await fs.access(storageDir).catch(async ()=>{
@@ -365,7 +365,7 @@ class SellerCentralBusinessReports{
      * @param {string} marketplaceDir - The marketplace base download path
      * @return void
      */
-    async #getReport(reportName, merchant, marketplace, marketplaceDir){
+    #getReport = async (reportName, merchant, marketplace, marketplaceDir) => {
         let reportDir = path.resolve(marketplaceDir+'/'+reportName)
         await fs.access(reportDir).catch(async ()=>{
             await fs.mkdir(reportDir)
@@ -422,12 +422,27 @@ class SellerCentralBusinessReports{
             await this.#Page.waitForSelector('span#downloadCSV', {visible: true})
             // start download
             await this.#Page.click('span#downloadCSV')
+            await this.#Page.waitForTimeout(2000)
             const dwMenu = await this.#Page.evaluate(() => document.querySelector('div#export ul.actionsDDsub').style.display)
             if (dwMenu === 'block') {
                 await this.#Page.waitForTimeout(3000)
                 await this.#Page.click('#downloadCSV') // bug fix
             }
             await this.#Page.waitForTimeout(10000) // wait for download
+            const dirContents = await fs.readdir(downloadDir)
+            if(dirContents.length < 1){
+                // no download file, try again
+                await this.#Page.evaluate(() => document.querySelector('div#export ul.actionsDDsub').style.display = 'block')
+                // restart download
+                await this.#Page.click('span#downloadCSV')
+                await this.#Page.waitForTimeout(2000)
+                const dwMenu = await this.#Page.evaluate(() => document.querySelector('div#export ul.actionsDDsub').style.display)
+                if (dwMenu === 'block') {
+                    await this.#Page.waitForTimeout(3000)
+                    await this.#Page.click('#downloadCSV') // bug fix
+                }
+            }
+
             this.#FilePromises.push(new Promise((resolve, reject) => {
                 const intvId = setInterval(async function (merchant, marketplace, downloadDir, that) {
                     const dir = await fs.readdir(downloadDir)
@@ -452,7 +467,7 @@ class SellerCentralBusinessReports{
         })
     }
 
-    async #getReportResponse(downloadDir,file){
+    #getReportResponse = async (downloadDir,file) => {
         let csvFile = path.resolve(downloadDir + '/' + file)
         let jsonResults = await csv({checkType: true}).fromFile(csvFile)
         let vars = csvFile.split(this.#UniqueId + '/')[1].split('/')
@@ -480,7 +495,7 @@ class SellerCentralBusinessReports{
      * Sets the Accounts and Page Menu Attributes
      * @return void
      */
-    async #setAccounts(){
+    #setAccounts = async () => {
         await this.#Page.waitForSelector('#sc-mkt-switcher')
         await this.#setAccountSelected()
         await this.#Page.click('#sc-mkt-switcher button.dropdown-button')
@@ -540,7 +555,7 @@ class SellerCentralBusinessReports{
      * @param {string} marketplace - The marketplace ID
      * @return void
      */
-    async #setAccountChange(merchant,marketplace) {
+    #setAccountChange = async (merchant,marketplace) => {
         await this.#Page.click('#merchant_'+merchant+' a#'+marketplace)
         await this.#Page.waitForTimeout(5000) // page changed
         // navigating to reports dashboard
@@ -555,7 +570,7 @@ class SellerCentralBusinessReports{
      * Sets the selected Account
      * @return void
      */
-    async #setAccountSelected(){
+    #setAccountSelected = async () => {
         await this.#Page.waitForSelector('#partner-switcher')
         this.#AccountSelected = await this.#Page.$eval('#partner-switcher', i => {
             return {
@@ -572,7 +587,7 @@ class SellerCentralBusinessReports{
      * Maps Accounts status and selected
      * @return void
      */
-    async #setAccountMap(){
+    #setAccountMap = async () => {
         this.#Accounts.forEach(a => {
             // set selected
             if(a.merchant === this.#AccountSelected.partner){
@@ -593,7 +608,7 @@ class SellerCentralBusinessReports{
      * @param {string} marketplace - The marketplace ID
      * @return void
      */
-    async #setAccountProcessed(merchant,marketplace){
+    #setAccountProcessed = async (merchant,marketplace) => {
         await this.#AccountsProcessed.push({
             merchant: merchant,
             marketplace: marketplace
